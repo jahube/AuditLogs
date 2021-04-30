@@ -1,3 +1,12 @@
+# CONNECT Exchange Online
+# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+# Register-PSRepository -Default
+# install-module ExchangeOnlineManagement -SkipPublisherCheck
+# install-module -name PowershellGet -Force -SkipPublisherCheck
+# Uninstall-Module PowershellGet -MaximumVersion "1.0.0.1" -Force -Confirm:$false -EA stop
+
+ IF (!(get-accepteddomain -EA silentlycontinue)) { Connect-ExchangeOnline }
+
 # $OfflineMode $false - [ONLINE]  collect Logs + parse
 # $OfflineMode $true - [OFFLINE] XML-File-Dialog + Parse
 
@@ -9,9 +18,6 @@ $ts = Get-Date -Format yyyyMMdd_hhmmss
 $DesktopPath = ([Environment]::GetFolderPath('Desktop'))
 $logsPATH = mkdir "$DesktopPath\MS-Logs\Mailbox-Audit-Logs_$ts"
 
-Start-Transcript "$logsPATH\Transcript_$ts.txt"
-$FormatEnumerationLimit = -1
-
 # check PS Session + check Exo Module V2 (+ install if not found) + connect + $credentials
 IF($OfflineMode -eq $false) {
 IF(!@(Get-PSSession | where { $_.State -ne "broken" } )) {
@@ -19,6 +25,9 @@ IF(!@(Get-InstalledModule ExchangeOnlineManagement -ErrorAction SilentlyContinue
 
 IF(!@($Credentials)) {$Credentials = Get-credential } ; IF(!@($ADMIN)) {$ADMIN = $Credentials.UserName }
 Try { Connect-ExchangeOnline -Credential $Credentials -EA stop } catch { Connect-ExchangeOnline -UserPrincipalName $ADMIN } }
+
+Start-Transcript "$logsPATH\Transcript_$ts.txt"
+$FormatEnumerationLimit = -1
 
 IF (!($Credentials.UserName -in (get-RoleGroupMember "Organization Management").primarySMTPaddress)) { Add-RoleGroupMember "Organization Management" -Member $ADMIN
 Try { Connect-ExchangeOnline -Credential $Credentials -EA stop } catch { Connect-ExchangeOnline -UserPrincipalName $ADMIN } }
@@ -30,6 +39,32 @@ IF (!($start)) { [int]$start = "-90" }
 IF (!($data)) { $data = Search-MailboxAuditLog -Identity $user -ShowDetails -StartDate (get-date).AddDays($start) -EndDate (get-date) }
 
 $data | Export-Clixml "$logsPATH\mailboxlogs.xml"
+
+# check results BEFORE
+$MBX = Get-Mailbox $user ; $PROW1 = $MBX.AuditOwner ; $PRDL1 = $MBX.AuditDelegate
+ Write-host "BEFORE: AuditOwner = $($PROW1.count)" -foregroundcolor yellow;  Write-host "AuditOwner: $($PROW1)" -foregroundcolor Cyan
+ Write-host "BEFORE: AuditOwner = $($PRDL1.count)" -foregroundcolor yellow;  Write-host "AuditOwner: $($PRDL1)" -foregroundcolor Cyan
+ 
+# Apply ALL DETAILS
+$Parameter = @{ identity = $user ; AuditEnabled = $true ;
+AuditOwner = 'AddFolderPermissions', 'ApplyRecord', 'Create', 'Send', 'HardDelete', 'MailboxLogin', 'ModifyFolderPermissions', 'Move', 'MoveToDeletedItems', 'RecordDelete', 'RemoveFolderPermissions', 'SoftDelete', 'Update', 'UpdateFolderPermissions', 'UpdateCalendarDelegation', 'UpdateInboxRules' ;
+AuditDelegate = 'AddFolderPermissions', 'ApplyRecord', 'Create', 'FolderBind', 'HardDelete', 'ModifyFolderPermissions', 'Move', 'MoveToDeletedItems', 'RecordDelete', 'RemoveFolderPermissions', 'SendAs', 'SendOnBehalf', 'SoftDelete', 'Update', 'UpdateFolderPermissions', 'UpdateInboxRules' ;
+AuditAdmin = 'Copy', 'Create', 'HardDelete', 'MoveToDeletedItems', 'RecordDelete', 'RemoveFolderPermissions', 'SendAs', 'SendOnBehalf', 'SoftDelete', 'Update', 'UpdateFolderPermissions', 'UpdateCalendarDelegation', 'UpdateInboxRules' }
+Set-Mailbox @Parameter 
+
+# On /Off to refresh update
+set-MailboxAuditBypassAssociation -Identity $user -AuditBypassEnabled $true  #OFF
+set-MailboxAuditBypassAssociation -Identity $user -AuditBypassEnabled $false  #ON
+
+# recheck results AFTER
+$MBX = Get-Mailbox $user ; $PROW1 = $MBX.AuditOwner ; $PRDL1 = $MBX.AuditDelegate
+ Write-host "AFTER: AuditOwner = $($PROW.count)" -foregroundcolor yellow;  Write-host "AuditOwner: $($PROW)" -foregroundcolor Cyan
+ Write-host "AFTER: AuditOwner = $($PRDL.count)" -foregroundcolor yellow;  Write-host "AuditOwner: $($PRDL)" -foregroundcolor Cyan
+
+# enable Unified Audit logs
+IF(!((Get-AdminAuditLogConfig).UnifiedAuditLogIngestionEnabled)) {
+Set-AdminAuditLogConfig -UnifiedAuditLogIngestionEnabled $true ;
+Write-host "Unified Audit log was disabled - ENABLING NOW" -F yellow }
 
 get-mailbox $user | select AuditEnabled
 get-mailbox $user | select -expandproperty auditadmin
