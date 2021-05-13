@@ -1,5 +1,6 @@
-﻿# Author: Fabrice Romelard
-# source https://techcommunity.microsoft.com/t5/office-365/powershell-script-to-export-audit-log-search-data-based-on/m-p/326589
+﻿# Author:  Fabrice Romelard
+# source   https://techcommunity.microsoft.com/t5/office-365/powershell-script-to-export-audit-log-search-data-based-on/m-p/32658
+# based on https://github.com/jahube/AuditLogs/blob/main/tmp/Split-O365AuditLogs-FromO365.ps1
 
 	[bool]$GLOBAL:specifyPeriod = $false # if false it will be the default period time specified $DefaultPeriodToCheck (last XX days)
 	[int]$GLOBAL:DefaultPeriodToCheck = -1 #last 14 days by default
