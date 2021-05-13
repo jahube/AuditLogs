@@ -1,3 +1,6 @@
+# Author: Fabrice Romelard
+# source https://techcommunity.microsoft.com/t5/office-365/powershell-script-to-export-audit-log-search-data-based-on/m-p/326589
+
 Function Split-O365AuditLogs-FromO365 ()
 {
     #Get the content to process
