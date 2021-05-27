@@ -28,9 +28,6 @@ Function Split-O365AuditLogs-FromO365 ()
 	Write-host " -----------------------------------------" -ForegroundColor Green
 
 
-IF(!((Get-AdminAuditLogConfig).UnifiedAuditLogIngestionEnabled)) {
-Set-AdminAuditLogConfig -UnifiedAuditLogIngestionEnabled $true ;
-Write-host "Unified Audit log was disabled - ENABLING NOW" -F yellow }
 
 ##########################################################################################
 
@@ -69,6 +66,10 @@ $FormatEnumerationLimit = -1
 
 IF (!($Credential.UserName -in (get-RoleGroupMember "Organization Management").primarySMTPaddress)) { Add-RoleGroupMember "Organization Management" -Member $Credential.UserName
 Try { Connect-ExchangeOnline -Credential $Credential -EA stop } catch { Connect-ExchangeOnline -UserPrincipalName $Credential.UserName } }
+
+IF(!((Get-AdminAuditLogConfig -Erroraction silentlycontinue).UnifiedAuditLogIngestionEnabled)) {
+Set-AdminAuditLogConfig -UnifiedAuditLogIngestionEnabled $true ;
+Write-host "Unified Audit log was disabled - ENABLING NOW" -F yellow }
 
 IF ($GLOBAL:specifyUserIDs) { Try { $MBXs = Get-ExoMailbox -ResultSize unlimited -EA stop } catch { $MBXs = get-mailbox -ResultSize unlimited } # read mailboxes - try { ExoMBX } catch { classic }
 IF ($MBXs.Count -gt "400") { $USER = Read-Host -Prompt "Affected User [Userprincipalname]" }                                                   # Above threshold - ask for manual user input
